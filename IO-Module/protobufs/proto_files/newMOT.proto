@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+service MOTor { //same as class in server
+  // Sends a greeting
+  rpc askInfer_MOT(MOT_pic) returns (MOT_reply) {}
+}
+
+// just to send sth (TODO: make blank without the weird error)
+message MOT_pic {
+  string image = 1; //set as you in client
+}
+
+message MOT_reply {
+  bytes image = 1; 
+
+	repeated SingleMOTDetection detections = 2;
+}
+
+// The response img
+message SingleMOTDetection {  
+  float x_low = 1;
+  float y_low = 2;
+  float x_high = 3;
+  float y_high = 4;
+
+  int32 id = 5;
+  int32 class = 6;
+  float confidence = 7;
+}
+
+
+ //Use this to regenerate proto files
+// python -m grpc_tools.protoc --proto_path=. ./grpc.proto --python_out=. --grpc_python_out=. 
+// python3 -m grpc_tools.protoc --proto_path=. ./mot.proto --python_out=. --grpc_python_out=. 

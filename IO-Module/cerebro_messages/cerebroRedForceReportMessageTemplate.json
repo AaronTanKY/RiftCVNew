@@ -1,0 +1,49 @@
+{
+  "messageHeader": {
+    "messageId": 1,
+    "timestamp": 1678014497
+  },
+  "cerebroId": "robotVision60_19",
+  "detection": {
+    "sensor": "EO"
+  },
+  "confidence": 88,
+  "targetChips": [
+    null
+  ],
+  "who": {
+    "adversity": "FRIENDLY"
+  },
+  "what": {
+    "assets": [],
+    "activity": {}
+  },
+  "where": {
+    "direction": "UNKNOWN",
+    "speed": 10,
+    "relativeLocation": {
+      "type": "POINT", 
+      "coordinates": [
+        {
+          "coordinate": [
+            1, 1
+          ]
+        }
+      ]
+    },
+    "location": {
+      "type": "POINT", 
+      "coordinates": [
+        {
+          "coordinate": [
+            1, 1
+          ]
+        }
+      ]
+    }
+  },
+  "when": {
+    "eventStart": "2023-04-15T12:34:56Z"
+  },
+  "why": {}
+}

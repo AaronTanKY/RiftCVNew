@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+service Greeter { //same as class in server
+  // Sends a greeting
+  rpc get_rframe (HelloRequest) returns (HelloReply) {}
+  rpc get_infrared_frame (HelloRequest) returns (HelloReply) {}
+  rpc ask_xyz (xy) returns (xyz) {}
+  rpc ask_xyzmap (xyznew) returns (xyzmap) {}
+
+  rpc get_intrin (HelloRequest) returns (intrin_list) {}
+  rpc get_depth (HelloRequest) returns (img) {}
+
+  // New RPC for getting MISB metadata
+  rpc get_metadata (HelloRequest) returns (MISBMetadata) {}
+}
+
+message intrin_list{
+  // int32 a = 1;
+  bytes coeffs = 1;
+  int32 width = 2;
+  int32 height = 3;
+  float ppx = 4;
+  float ppy = 5;
+  float fx = 6;
+  float fy = 7;
+
+  bytes depth = 8;
+}
+
+message img{
+  bytes img_data = 1;
+}
+
+message HelloRequest {
+  string name = 1; //set as garbage/ / TODO: make empty
+}
+
+message HelloReply {
+  bytes message = 1; 
+}
+
+message xy{
+  string x = 1;
+  string y = 2;
+}
+
+message xyz{
+  string x = 1;
+  string y = 2;
+  string z = 3;
+}
+
+message xyxy{
+  string x_lo = 1;
+  string y_lo = 2;
+  string x_hi = 3;
+  string y_hi = 4;
+}
+
+message xyznew{
+  string xnew = 1;
+  string ynew = 2;
+  string znew = 3;
+}
+
+message xyzmap{
+  string xnew = 1;
+  string ynew = 2;
+  string znew = 3;
+} 
+
+// New message definitions for MISB metadata
+message MISBMetadata {
+  bytes metadataitem = 1;
+}
+
+// python -m grpc_tools.protoc --proto_path=. ./grpc.proto --python_out=../ --grpc_python_out=../
+// python3 -m grpc_tools.protoc --proto_path=. ./main_server2.proto --python_out=../ --grpc_python_out=../
+
+// THIS WORKS: python3 -m grpc_tools.protoc --proto_path=. ./main_server2.proto --python_out=../ --grpc_python_out=../
+

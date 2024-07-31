@@ -1,0 +1,21 @@
+---
+CENT: 0 #tbh this doesnt rly matter anymore
+#0 = edge, 1 = centralised source, 2 = centralised computer, 3 = centralised dstination, 4 = edge no send js view
+DISP: 0 #also kinda useless now
+# 0 = no display, 1 = display
+
+MAX_DEPTH: 1000 #65535 #Raw depth values can be from 0 to 65535
+#MUST MATCH ON EDGE
+
+CLIENT_PORT: 50049
+CAMERA_PORT: 50050
+POSEEST_PORT: 8443
+OBJDETECT_PORT: 50051
+MOT_PORT: 50052
+
+MQTT_HOST: "localhost"
+#MQTT_HOST: "192.168.50.220"
+MQTT_PORT: 1883
+
+CEREBRO_ID: robotVision60_019
+SENSOR_TYPE: EO

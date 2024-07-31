@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+service objDetector { //same as class in server
+  // Sends a greeting
+  rpc askInfer_objDetect(objDetect_pic) returns (objDetect_reply) {}
+}
+
+// just to send sth (TODO: make blank without the weird error)
+message objDetect_pic {
+  string name = 1; //set as you in client
+}
+
+// The response img
+message objDetect_reply {
+  bytes message = 1; 
+  
+  string x_lo = 2;
+  string y_lo = 3;
+  string x_hi = 4;
+  string y_hi = 5;
+}
+
+//python -m grpc_tools.protoc --proto_path=. ./grpc.proto --python_out=. --grpc_python_out=. 
+
+// python -m grpc_tools.protoc --proto_path=. ./flask_object_detection.proto --python_out=. --grpc_python_out=. 

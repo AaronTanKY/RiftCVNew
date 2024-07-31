@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+service poseEstor { //same as class in server
+  // Sends a greeting
+  rpc askInfer_poseEst(poseEst_pic) returns (poseEst_reply) {}
+}
+
+// just to send sth (TODO: make blank without the weird error)
+message poseEst_pic {
+  string name = 1; //set as you in client
+}
+
+// The response img
+message poseEst_reply {
+  bytes message = 1; 
+}
+
+ //Use this to regenerate proto files
+//python -m grpc_tools.protoc --proto_path=. ./grpc.proto --python_out=. --grpc_python_out=. 
+
+// python -m grpc_tools.protoc --proto_path=. ./poseEst.proto --python_out=. --grpc_python_out=. 
