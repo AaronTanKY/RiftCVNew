@@ -1,0 +1,16 @@
+metadata:
+  tags:
+  - compiled
+options:
+  inference:
+    context: cuda
+  preprocessor: processors/af_preprocessor.json
+  postprocessor: processors/general_detection_postprocessor.py::postprocess
+  task_family: detection
+  extras:
+    height: 512
+    iou_threshold: 0.7
+    k: null
+    max_det_per_image: 100
+    prediction_confidence_threshold: 0.001
+    width: 512
