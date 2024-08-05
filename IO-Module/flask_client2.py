@@ -557,6 +557,8 @@ from gi.repository import Gst, GLib, GObject
 GObject.threads_init()
 Gst.init(None)
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 def create_gstreamer_pipeline(frame_queue, metadata_queue):
     # video source elements
     vsrc = Gst.ElementFactory.make("appsrc", "vidsrc")
@@ -567,17 +569,18 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     appsrc = Gst.ElementFactory.make("appsrc")
     queue_klv = Gst.ElementFactory.make("queue")
 
-    # display elements
-    queue_display = Gst.ElementFactory.make("queue")
-    vcvt = Gst.ElementFactory.make("videoconvert", "vidcvt")
-    vsink = Gst.ElementFactory.make("autovideosink", "vidsink")
+    # # display elements
+    # queue_display = Gst.ElementFactory.make("queue")
+    # vcvt = Gst.ElementFactory.make("videoconvert", "vidcvt")
+    # vsink = Gst.ElementFactory.make("autovideosink", "vidsink")
 
     # recording elements
     queue_record = Gst.ElementFactory.make("queue")
     vcvt_encoder = Gst.ElementFactory.make("videoconvert")
     encoder = Gst.ElementFactory.make("x264enc")
     muxer = Gst.ElementFactory.make("mpegtsmux")
-    filesink = Gst.ElementFactory.make("filesink")
+    # filesink = Gst.ElementFactory.make("filesink")
+    udpsink = Gst.ElementFactory.make("udpsink")
 
     # configure video elementvsrc = Gst.ElementFactory.make("appsrc", "vidsrc")
     vqueue = Gst.ElementFactory.make("queue")
@@ -587,10 +590,10 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     appsrc = Gst.ElementFactory.make("appsrc")
     queue_klv = Gst.ElementFactory.make("queue")
 
-    # display elements
-    queue_display = Gst.ElementFactory.make("queue")
-    vcvt = Gst.ElementFactory.make("videoconvert", "vidcvt")
-    vsink = Gst.ElementFactory.make("autovideosink", "vidsink")
+    # # display elements
+    # queue_display = Gst.ElementFactory.make("queue")
+    # vcvt = Gst.ElementFactory.make("videoconvert", "vidcvt")
+    # vsink = Gst.ElementFactory.make("autovideosink", "vidsink")
 
     vid_width = 1920
     vid_height = 1080
@@ -614,11 +617,17 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     encoder.set_property("noise-reduction", 1000)
     encoder.set_property("threads", 4)
     encoder.set_property("bitrate", 1755)
+    encoder.set_property("tune", "zerolatency")
 
     # configure filesink
-    out_file = "output3.ts"
-    filesink.set_property("location", out_file)
-    filesink.set_property("async", 0)
+    # out_file = "output3.ts"
+    # filesink.set_property("location", out_file)
+    # filesink.set_property("async", 0)
+
+    # configure udpsink
+    udpsink.set_property("host", "127.0.0.1")
+    udpsink.set_property("port", 5555)
+    udpsink.set_property("async", 0)
 
     pipeline = Gst.Pipeline()
     pipeline.add(vsrc)
@@ -626,30 +635,30 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     pipeline.add(vtee)
     pipeline.add(appsrc)
     pipeline.add(queue_klv)
-    pipeline.add(queue_display)
-    pipeline.add(vcvt)
-    pipeline.add(vsink)
+    # pipeline.add(queue_display)
+    # pipeline.add(vcvt)
+    # pipeline.add(vsink)
     pipeline.add(queue_record)
     pipeline.add(vcvt_encoder)
     pipeline.add(encoder)
     pipeline.add(muxer)
-    pipeline.add(filesink)
+    pipeline.add(udpsink)
 
     # link video elements
     vsrc.link(vqueue)
     vqueue.link(vtee)
 
-    # link display elements
-    vtee.link(queue_display)
-    queue_display.link(vcvt)
-    vcvt.link(vsink)
+    # # link display elements
+    # vtee.link(queue_display)
+    # queue_display.link(vcvt)
+    # vcvt.link(vsink)
 
     # link recording elements
     vtee.link(queue_record)
     queue_record.link(vcvt_encoder)
     vcvt_encoder.link(encoder)
     encoder.link(muxer)
-    muxer.link(filesink)
+    muxer.link(udpsink)
 
     # link klv elements
     appsrc.link(queue_klv)
@@ -692,10 +701,12 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
         if t - last_vid_t >= 1.0 / vid_frame_rate:
             if not vid_done:
                 img_byte = frame_queue.get(timeout=5)
+                logging.debug("Retrieved frame from queue, queue size: %d", frame_queue.qsize())
                 if img_byte:
                     jpg_original = base64.b64decode(img_byte)
                     jpg_as_np = np.frombuffer(jpg_original, dtype=np.uint8)
                     frame = cv2.imdecode(jpg_as_np, flags=1)
+                    
                     # Convert BGR to RGB
                     frame_RGB = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     data = frame_RGB.tostring()
@@ -762,7 +773,11 @@ def gather_frames_and_metadata(frame_queue, metadata_queue):
             
 
             if frame is not None:
+                if frame_queue.full():
+                    logging.debug("Frame queue is full, removing the oldest frame.")
+                    frame_queue.get()  # Remove the first frame in the queue
                 frame_queue.put(frame)
+                logging.debug("Added frame to queue, queue size: %d", frame_queue.qsize())
             else:
                 print("Failed to decode frame")
             
@@ -774,8 +789,8 @@ def gather_frames_and_metadata(frame_queue, metadata_queue):
 
 @app.route("/GstreamerOut")
 def gstreamer_out():
-    frame_queue = queue.Queue(maxsize=10000)
-    metadata_queue = queue.Queue(maxsize=10000)
+    frame_queue = queue.Queue(maxsize=200)
+    metadata_queue = queue.Queue(maxsize=200)
     
     threading.Thread(target=gather_frames_and_metadata, args=(frame_queue, metadata_queue), daemon=True).start()
     threading.Thread(target=create_gstreamer_pipeline, args=(frame_queue, metadata_queue), daemon=True).start()
