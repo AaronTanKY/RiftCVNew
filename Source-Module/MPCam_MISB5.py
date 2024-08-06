@@ -41,7 +41,10 @@ class Cam(AbstractCam):
         while self._running:
             ret, frame = self._cap.read()
             if ret:
-                self._frame = frame
+                if self._cap.isOpened():
+                    self._frame = frame
+                else:
+                    self._frame = None
             else:
                 self._running = False
             #self.display_frame()
@@ -72,20 +75,62 @@ class Cam(AbstractCam):
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         return process.stdout
 
+    # def _process_metadata(self):
+    #     print("Retrieving Metadata...")
+    #     metadata_stream = self.extract_metadata()
+    #     while self._running:
+    #         try:
+    #             packet = metadata_stream.read(188)
+    #             if not packet:
+    #                 # End of stream, restart
+    #                 metadata_stream = self.extract_metadata()
+    #                 continue
+    #             self._metadata = packet
+    #         except Exception as e:
+    #             print(f"Error processing metadata: {e}")
+    #             metadata_stream = self.extract_metadata()
+
     def _process_metadata(self):
         print("Retrieving Metadata...")
         metadata_stream = self.extract_metadata()
+        buffer = b''
         while self._running:
             try:
-                packet = metadata_stream.read(188)
-                if not packet:
+                # Read data into buffer
+                chunk = metadata_stream.read(1024)
+                if not chunk:
                     # End of stream, restart
                     metadata_stream = self.extract_metadata()
+                    buffer = b''
                     continue
-                self._metadata = packet
+                buffer += chunk
+
+                # Process complete packets
+                while len(buffer) >= 188:
+                    # Look for sync byte
+                    sync_index = buffer.find(b'\x47')
+                    if sync_index == -1:
+                        # No sync byte found, discard all but last 187 bytes
+                        buffer = buffer[-187:]
+                        break
+                    elif sync_index > 0:
+                        # Sync byte not at start, discard preceding bytes
+                        buffer = buffer[sync_index:]
+                        continue
+
+                    # Extract a complete packet
+                    packet = buffer[:188]
+                    buffer = buffer[188:]
+
+                    # # Process the packet
+                    # self._process_packet(packet)
+
+                    self._metadata = packet
+
             except Exception as e:
                 print(f"Error processing metadata: {e}")
                 metadata_stream = self.extract_metadata()
+                buffer = b''
 
     ### GET FUNCTIONS
     def get_frame(self):
