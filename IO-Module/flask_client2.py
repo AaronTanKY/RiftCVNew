@@ -579,8 +579,8 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     vcvt_encoder = Gst.ElementFactory.make("videoconvert")
     encoder = Gst.ElementFactory.make("x264enc")
     muxer = Gst.ElementFactory.make("mpegtsmux")
-    # filesink = Gst.ElementFactory.make("filesink")
-    udpsink = Gst.ElementFactory.make("udpsink")
+    filesink = Gst.ElementFactory.make("filesink")
+    # udpsink = Gst.ElementFactory.make("udpsink")
 
     # configure video elementvsrc = Gst.ElementFactory.make("appsrc", "vidsrc")
     vqueue = Gst.ElementFactory.make("queue")
@@ -620,14 +620,14 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     encoder.set_property("tune", "zerolatency")
 
     # configure filesink
-    # out_file = "output3.ts"
-    # filesink.set_property("location", out_file)
-    # filesink.set_property("async", 0)
+    out_file = "output3.ts"
+    filesink.set_property("location", out_file)
+    filesink.set_property("async", 0)
 
     # configure udpsink
-    udpsink.set_property("host", "127.0.0.1")
-    udpsink.set_property("port", 5555)
-    udpsink.set_property("async", 0)
+    # udpsink.set_property("host", "127.0.0.1")
+    # udpsink.set_property("port", 5555)
+    # udpsink.set_property("async", 0)
 
     pipeline = Gst.Pipeline()
     pipeline.add(vsrc)
@@ -642,7 +642,8 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     pipeline.add(vcvt_encoder)
     pipeline.add(encoder)
     pipeline.add(muxer)
-    pipeline.add(udpsink)
+    pipeline.add(filesink)
+    # pipeline.add(udpsink)
 
     # link video elements
     vsrc.link(vqueue)
@@ -658,7 +659,8 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
     queue_record.link(vcvt_encoder)
     vcvt_encoder.link(encoder)
     encoder.link(muxer)
-    muxer.link(udpsink)
+    muxer.link(filesink)
+    # muxer.link(udpsink)
 
     # link klv elements
     appsrc.link(queue_klv)
@@ -668,7 +670,7 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
 
     klv_frame_rate = 30
     
-    metadata = metadata_queue.get(timeout=5).metadataitem
+    metadata = metadata_queue.get().metadataitem
     timestamp = 0
 
     klv_done = False
@@ -700,7 +702,7 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
 
         if t - last_vid_t >= 1.0 / vid_frame_rate:
             if not vid_done:
-                img_byte = frame_queue.get(timeout=5)
+                img_byte = frame_queue.get()
                 logging.debug("Retrieved frame from queue, queue size: %d", frame_queue.qsize())
                 if img_byte:
                     jpg_original = base64.b64decode(img_byte)
@@ -762,26 +764,50 @@ def create_gstreamer_pipeline(frame_queue, metadata_queue):
 def gather_frames_and_metadata(frame_queue, metadata_queue):
     stub = pb2_grpc.GreeterStub(grpc.insecure_channel("localhost:" + str(CFG["CAMERA_PORT"])))
     objDetect_stub = od_pb2_grpc.objDetectorStub(grpc.insecure_channel("localhost:" + str(CFG["OBJDETECT_PORT"])))
+    empty_frame_source = os.path.join(os.path.dirname(__file__), "empty_message.txt")
+    empty_metadata_source = os.path.join(os.path.dirname(__file__), "empty_metadataitem.txt")
+
+    with Path(empty_frame_source).open() as f:
+        empty_frame_string = f.read().replace("\n","")
     
+    with Path(empty_metadata_source).open() as f:
+        empty_metadata_string = f.read().replace("\n","")
+    
+    empty_frame_bytes = empty_frame_string.encode('utf-8')
+    empty_metadata_bytes = empty_metadata_string.encode('utf-8')
+    empty_metadata_bytes = b''
+
     print("Starting frame gathering")
     while True:
         try:
             frame_response = stub.get_rframe(pb2.HelloRequest(name="y"))
             metadata = stub.get_metadata(pb2.HelloRequest(name="y"))
+            metadata_item = metadata.metadataitem
             results = objDetect_stub.askInfer_objDetect(od_pb2.objDetect_pic(name=frame_response.message))
             frame = results.message
-            
 
-            if frame is not None:
+            # cv2.imshow('Display', imgFromBytes(frame))
+            # time.sleep(1000)            
+
+            
+            if frame and frame != empty_frame_bytes:
                 if frame_queue.full():
                     logging.debug("Frame queue is full, removing the oldest frame.")
                     frame_queue.get()  # Remove the first frame in the queue
                 frame_queue.put(frame)
                 logging.debug("Added frame to queue, queue size: %d", frame_queue.qsize())
             else:
-                print("Failed to decode frame")
+                print("No frame detected")
             
-            metadata_queue.put(metadata)
+            if metadata_item and metadata_item != empty_metadata_bytes:
+                if metadata_queue.full():
+                    logging.debug("Metadata queue is full, removing the oldest frame.")
+                    metadata_queue.get()  # Remove the first frame in the queue
+                metadata_queue.put(metadata)
+                logging.debug("Added metadata to queue, queue size: %d", frame_queue.qsize())
+            else:
+                print("No metadata detected")
+            
             
         except Exception as e:
             print(f"Error gathering frames and metadata: {e}")
@@ -789,8 +815,8 @@ def gather_frames_and_metadata(frame_queue, metadata_queue):
 
 @app.route("/GstreamerOut")
 def gstreamer_out():
-    frame_queue = queue.Queue(maxsize=200)
-    metadata_queue = queue.Queue(maxsize=200)
+    frame_queue = queue.Queue()
+    metadata_queue = queue.Queue()
     
     threading.Thread(target=gather_frames_and_metadata, args=(frame_queue, metadata_queue), daemon=True).start()
     threading.Thread(target=create_gstreamer_pipeline, args=(frame_queue, metadata_queue), daemon=True).start()
@@ -817,11 +843,6 @@ if __name__ == "__main__":
     with Path(yaml_source).open() as f:
         CFG = yaml.load(f, Loader=yaml.Loader)
 
-
-    port = int(CFG["CAMERA_PORT"])
-    kill_process_on_port(port)
-    time.sleep(0.5)  # if not the app.run runs first and u die
-
     client = mqtt.Client()
     client.on_connect = on_connect
     client.connect(str(CFG["MQTT_HOST"]), int(CFG["MQTT_PORT"]))
@@ -830,6 +851,8 @@ if __name__ == "__main__":
 
     logging.basicConfig()
 
+    port = int(CFG["CLIENT_PORT"])
+    kill_process_on_port(port)
     time.sleep(1)  # if not the app.run runs first and u die
     app.run(host="0.0.0.0", port=CFG["CLIENT_PORT"], threaded=True)
 

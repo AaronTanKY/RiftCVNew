@@ -82,9 +82,12 @@ class Greeter(pb2_grpc.GreeterServicer):
             rclpy.spin_once(self.cam)
 
         img = self.cam.get_frame()
-        _, buffer = cv2.imencode(".jpg", img)
-        data = base64.b64encode(buffer)
-        return pb2.HelloReply(message=data)  # request.name) #'Hello, %s!' %
+        if img is not None:
+            _, buffer = cv2.imencode(".jpg", img)
+            data = base64.b64encode(buffer)
+            return pb2.HelloReply(message=data)  # request.name) #'Hello, %s!' %
+        else:
+            return pb2.HelloReply(message=b'')
     
     def get_metadata(self, request, context):
         if args.camera_interface == 3:  # MISB

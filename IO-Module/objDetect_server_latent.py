@@ -5,6 +5,8 @@
 # and is released under the Apache 2.0 License.
 # *****************************************************************************/
 
+# N: Skipping acquire of configured file 'main/binary-i386/Packages' as repository 'https://apt.latentai.io stable InRelease' doesn't support architecture 'i386'
+
 #!/usr/bin/env python
 
 # Previous imports
